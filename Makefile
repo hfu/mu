@@ -10,4 +10,5 @@ all: pmtiles
 pmtiles:
 	ogr2ogr -f GeoJSONSeq /vsistdout/ $(SRC_SHAPE) | \
 	jq -c -f transform.jq | \
-	tippecanoe -f --attribution="Natural Earth" --maximum-zoom=10 -o docs/mu.pmtiles.gz
+	tippecanoe -f --attribution="Natural Earth" --maximum-zoom=10 -o docs/mu.pmtiles
+	mv docs/mu.pmtiles docs/mu.pmtiles.gz 
