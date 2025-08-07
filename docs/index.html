@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mu Projection Globe</title>
+    <script src="https://unpkg.com/maplibre-gl@5.0.0/dist/maplibre-gl.js"></script>
+    <link href="https://unpkg.com/maplibre-gl@5.0.0/dist/maplibre-gl.css" rel="stylesheet" />
+    <script src="https://unpkg.com/pmtiles@3.0.6/dist/pmtiles.js"></script>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        
+        #map {
+            position: absolute;
+            top: 0;
+            bottom: 0;
+            width: 100%;
+        }
+        
+        .info-panel {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            background: rgba(0, 0, 0, 0.8);
+            color: white;
+            padding: 15px;
+            border-radius: 8px;
+            max-width: 300px;
+            z-index: 1000;
+            font-size: 14px;
+            line-height: 1.4;
+        }
+        
+        .info-panel h1 {
+            margin: 0 0 10px 0;
+            font-size: 18px;
+            font-weight: bold;
+        }
+        
+        .info-panel p {
+            margin: 5px 0;
+        }
+        
+        .maplibregl-ctrl-logo {
+            display: none !important;
+        }
+    </style>
+</head>
+<body>
+    <div id="map"></div>
+    <div class="info-panel">
+        <h1>Mu Projection Globe</h1>
+        <p>このマップは、Natural Earthの海岸線データをMu座標系に変換して表示しています。</p>
+        <p>Globe modeでの3D表示をお楽しみください。</p>
+        <p><strong>データソース:</strong> Natural Earth</p>
+    </div>
+
+    <script>
+        // PMTiles protocol を追加
+        let protocol = new pmtiles.Protocol();
+        maplibregl.addProtocol("pmtiles", protocol.tile);
+
+        // MapLibre GL JS マップを初期化
+        const map = new maplibregl.Map({
+            container: 'map',
+            style: {
+                version: 8,
+                sources: {
+                    'mu-coastline': {
+                        type: 'vector',
+                        url: 'pmtiles://./mu.pmtiles.gz'
+                    }
+                },
+                layers: [
+                    {
+                        id: 'background',
+                        type: 'background',
+                        paint: {
+                            'background-color': '#1a1a2e'
+                        }
+                    },
+                    {
+                        id: 'mu-coastline',
+                        type: 'line',
+                        source: 'mu-coastline',
+                        'source-layer': 'prototype',
+                        paint: {
+                            'line-color': '#00ff88',
+                            'line-width': [
+                                'interpolate',
+                                ['linear'],
+                                ['zoom'],
+                                0, 0.5,
+                                5, 1,
+                                10, 2
+                            ],
+                            'line-opacity': 0.8
+                        }
+                    }
+                ]
+            },
+            center: [0, 0],
+            zoom: 1,
+            pitch: 0,
+            bearing: 0
+        });
+
+        // マップ読み込み完了時の処理
+        map.on('load', () => {
+            // Globe projection を設定
+            map.setProjection({type: 'globe'});
+            
+            // コントロールを追加
+            map.addControl(new maplibregl.NavigationControl(), 'top-right');
+            map.addControl(new maplibregl.GlobeControl(), 'top-right');
+            
+            // フルスクリーンコントロールも追加
+            map.addControl(new maplibregl.FullscreenControl(), 'top-right');
+            
+            console.log('Map loaded with globe projection and mu.pmtiles.gz data');
+        });
+
+        // エラーハンドリング
+        map.on('error', (e) => {
+            console.error('Map error:', e);
+        });
+
+        // データソースエラーハンドリング
+        map.on('sourcedataloading', (e) => {
+            if (e.sourceId === 'mu-coastline') {
+                console.log('Loading mu-coastline data...');
+            }
+        });
+
+        map.on('sourcedata', (e) => {
+            if (e.sourceId === 'mu-coastline' && e.isSourceLoaded) {
+                console.log('mu-coastline data loaded successfully');
+            }
+        });
+
+        // 自動回転機能（オプション）
+        let isRotating = false;
+        
+        // 'R'キーで回転開始/停止
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'r' || e.key === 'R') {
+                isRotating = !isRotating;
+                if (isRotating) {
+                    rotateCamera();
+                    console.log('Auto-rotation started (press R to stop)');
+                } else {
+                    console.log('Auto-rotation stopped');
+                }
+            }
+        });
+
+        function rotateCamera() {
+            if (!isRotating) return;
+            
+            map.easeTo({
+                bearing: map.getBearing() + 0.5,
+                duration: 100,
+                easing: (t) => t
+            });
+            
+            requestAnimationFrame(rotateCamera);
+        }
+
+        // スタートアップメッセージ
+        console.log('Mu Projection Globe initialized. Press R to toggle auto-rotation.');
+    </script>
+</body>
+</html>
