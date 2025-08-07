@@ -22,14 +22,14 @@ muTransformation (ムー変換) is a coordinate transformation that:
 
 - **Interactive Globe Visualization**: View the transformed coastline data in 3D globe mode using MapLibre GL JS v5.0.0
 - **PMTiles Format**: Efficient vector tile format for web mapping
-- **Spherical-aware Processing**: Uses tippecanoe with gamma correction and shared border detection for optimal sphere representation
+- **Longitude Wraparound Handling**: Uses tippecanoe with longitude wraparound detection for proper coordinate handling
 - **Auto-rotation**: Press 'R' key to toggle automatic globe rotation
 
 機能：
 
 - **インタラクティブなグローブ表示**: MapLibre GL JS v5.0.0を使用して変換された海岸線データを3Dグローブモードで表示
 - **PMTilesフォーマット**: ウェブマッピング用の効率的なベクトルタイル形式
-- **球面対応処理**: ガンマ補正と境界共有検出を使用したtippecanoeによる最適な球面表現
+- **経度回り込み処理**: 適切な座標処理のために経度回り込み検出機能を備えたtippecanoeを使用
 - **自動回転**: 'R'キーで自動グローブ回転の切り替え
 
 ## Prototype design / プロトタイプ設計
@@ -39,7 +39,7 @@ muTransformation (ムー変換) is a coordinate transformation that:
 - The `pmtiles` task will:
   - Create GeoJSON Text Sequence from the shapefile in `src` directory.
   - Filter the sequence using `jq` that apply muTransformation suggested in <https://github.com/UNopenGIS/7/issues/760>.
-  - Generate PMTiles file with tippecanoe containing the transformed coastline data with spherical optimization.
+  - Generate PMTiles file with tippecanoe containing the transformed coastline data with longitude wraparound detection.
 
 プロトタイプ設計：
 
@@ -48,7 +48,7 @@ muTransformation (ムー変換) is a coordinate transformation that:
 - `pmtiles`タスクは以下を実行します：
   - `src`ディレクトリのシェープファイルからGeoJSON Text Sequenceを作成
   - <https://github.com/UNopenGIS/7/issues/760> で提案されたムー変換を適用する`jq`によるシーケンスフィルタリング
-  - 球面最適化された変換済み海岸線データを含むPMTilesファイルをtippecanoeで生成
+  - 経度回り込み検出機能を備えたtippecanoeで変換済み海岸線データを含むPMTilesファイルを生成
 
 ## Build Process / ビルドプロセス
 
@@ -65,8 +65,8 @@ python3 -m http.server 8000
 
 The build process includes: / ビルドプロセスには以下が含まれます：
 
-- `--detect-shared-borders`: Detects shared boundaries between adjacent features / 隣接フィーチャー間の共有境界を検出
-- `--gamma=2.0`: Applies gamma correction for spherical representation / 球面表現のためのガンマ補正を適用
+- `--detect-longitude-wraparound`: Detects and handles longitude wraparound issues / 経度の回り込み問題を検出・処理
+- `--maximum-zoom=10`: Sets the maximum zoom level to 10 / 最大ズームレベルを10に設定
 
 ## Mathematical transformation / 数学的変換
 
@@ -91,7 +91,7 @@ Example transformations: / 変換例：
 
 - **MapLibre GL JS v5.0.0**: For interactive globe visualization / インタラクティブなグローブ表示用
 - **PMTiles v3.0.6**: For efficient vector tile delivery / 効率的なベクトルタイル配信用
-- **tippecanoe**: Vector tile generation with spherical optimization / 球面最適化によるベクトルタイル生成
+- **tippecanoe**: Vector tile generation with longitude wraparound detection / 経度回り込み検出によるベクトルタイル生成
 - **jq**: Coordinate transformation processing / 座標変換処理
 - **GDAL/OGR**: Shapefile to GeoJSON conversion / シェープファイルからGeoJSONへの変換
 
