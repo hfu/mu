@@ -20,78 +20,102 @@ muTransformation (ムー変換) is a coordinate transformation that:
 
 ## Features / 機能
 
-- **Interactive Globe Visualization**: View the transformed coastline data in 3D globe mode using MapLibre GL JS v5.0.0
-- **PMTiles Format**: Efficient vector tile format for web mapping
-- **Longitude Wraparound Handling**: Uses tippecanoe with longitude wraparound detection for proper coordinate handling
-- **Auto-rotation**: Press 'R' key to toggle automatic globe rotation
+- Interactive Globe Visualization: View the transformed coastline and AQ layers in 3D globe mode using MapLibre GL JS v5.0.0
+- PMTiles Format: Efficient vector tile format for web mapping
+- Longitude Wraparound Handling: Uses tippecanoe with longitude wraparound detection
+- Auto-rotation: Press 'R' to toggle globe rotation
 
 機能：
 
-- **インタラクティブなグローブ表示**: MapLibre GL JS v5.0.0を使用して変換された海岸線データを3Dグローブモードで表示
-- **PMTilesフォーマット**: ウェブマッピング用の効率的なベクトルタイル形式
-- **経度回り込み処理**: 適切な座標処理のために経度回り込み検出機能を備えたtippecanoeを使用
-- **自動回転**: 'R'キーで自動グローブ回転の切り替え
+- インタラクティブなグローブ表示: MapLibre GL JS v5.0.0で海岸線とAQレイヤを3D表示
+- PMTilesフォーマット: ウェブマッピング用の効率的なベクトルタイル
+- 経度回り込み処理: tippecanoeのwraparound検出を使用
+- 自動回転: 'R'キーで切り替え
 
 ## Prototype design / プロトタイプ設計
 
 - This is an implementation of <https://github.com/UNopenGIS/7/issues/760>
 - All the process is controlled by Makefile
 - The `pmtiles` task will:
-  - Create GeoJSON Text Sequence from the shapefile in `src` directory.
-  - Filter the sequence using `jq` that apply muTransformation suggested in <https://github.com/UNopenGIS/7/issues/760>.
-  - Generate PMTiles file with tippecanoe containing the transformed coastline data with longitude wraparound detection.
+  - Create GeoJSON Text Sequence from the coastline shapefile in `src`
+  - Filter with `jq` applying muTransformation in `transform.jq`
+  - Generate `docs/mu.pmtiles.gz` with tippecanoe (wraparound detection)
+- The `aq` task will:
+  - Stream-convert all `../gmaq10/wgs84_*.shp` with `ogr2ogr`
+  - Apply muTransformation with `transform.jq`
+  - Inject per-feature `.tippecanoe.layer` from filename (`wgs84_*.shp` -> `*`)
+  - Pipe to one tippecanoe process and output `docs/aq.pmtiles.gz`
 
 プロトタイプ設計：
 
 - これは <https://github.com/UNopenGIS/7/issues/760> の実装です
-- すべての処理はMakefileで制御されています
-- `pmtiles`タスクは以下を実行します：
-  - `src`ディレクトリのシェープファイルからGeoJSON Text Sequenceを作成
-  - <https://github.com/UNopenGIS/7/issues/760> で提案されたムー変換を適用する`jq`によるシーケンスフィルタリング
-  - 経度回り込み検出機能を備えたtippecanoeで変換済み海岸線データを含むPMTilesファイルを生成
+- すべての処理はMakefileで制御
+- `pmtiles` タスク:
+  - `src` の海岸線SHPをGeoJSONテキストシーケンスへ
+  - `transform.jq` でムー変換
+  - tippecanoeで `docs/mu.pmtiles.gz` を生成
+- `aq` タスク:
+  - `../gmaq10/wgs84_*.shp` を逐次 `ogr2ogr` でストリーム変換
+  - `transform.jq` でムー変換
+  - ファイル名から `.tippecanoe.layer` を設定（例: bnda, bndl, hydroa, hydrol, popp, transl, transp）
+  - 1プロセスのtippecanoeへstdinで投入し `docs/aq.pmtiles.gz` を生成
 
 ## Build Process / ビルドプロセス
 
 ```bash
-# Generate PMTiles with spherical optimization
-# 球面最適化でPMTilesを生成
+# Coastline PMTiles
 make pmtiles
 
-# Serve locally for testing
-# ローカルでテスト用サーバーを起動
+# AQ PMTiles
+make aq
+
+# Serve locally
 cd docs
 python3 -m http.server 8000
 ```
 
 The build process includes: / ビルドプロセスには以下が含まれます：
 
-- `--detect-longitude-wraparound`: Detects and handles longitude wraparound issues / 経度の回り込み問題を検出・処理
-- `--maximum-zoom=10`: Sets the maximum zoom level to 10 / 最大ズームレベルを10に設定
+- `--detect-longitude-wraparound`: Detects and handles longitude wraparound issues / 経度の回り込み検出
+- `--maximum-zoom=10`: Sets maximum zoom level to 10 / 最大ズーム10
+
+## Visualization / 可視化
+
+- Data order: mu.pmtiles.gz first, aq.pmtiles.gz second / データの描画順は mu → aq
+- Layer order in aq: polygons (bnda, hydroa) → lines (bndl, hydrol, transl) → points (transp) → labels (popp)
+- Styles:
+  - page/canvas background: near-black, globe background layer: dark gray `#1f1f1f`
+  - bnda fill: off-white `#f7f7f5` (no stroke)
+  - hydroa fill: ice-like pale `#eef6ff` (slightly higher opacity 0.5)
+  - hydrol line: thicker widths (0.4/1.0/2.0 by zoom)
+  - transl line: dark gray `#444444`
+  - popp labels: `NAM` attribute with halo
+- Initial view: center [180, 0], zoom 4 / 初期表示: 中心 [180, 0], ズーム 4
 
 ## Mathematical transformation / 数学的変換
 
 The transformation converts spherical coordinates through: / 変換は以下の手順で球面座標を変換します：
 
-1. lat/lng → spherical coordinates (x, y, z) / 緯度経度 → 球面座標 (x, y, z)
-2. Y-axis rotation by -90° (X→Z, Z→-X) / Y軸周りに-90°回転 (X→Z, Z→-X)
-3. spherical coordinates → lat/lng / 球面座標 → 緯度経度
+1. lat/lng → spherical coordinates (x, y, z)
+2. Y-axis rotation by -90° (X→Z, Z→-X)
+3. spherical coordinates → lat/lng
 
 Example transformations: / 変換例：
 
-- North Pole (0, 90) → ≈ (0, 0) / 北極 (0, 90) → ≈ (0, 0)
-- South Pole (0, -90) → ≈ (180, 0) / 南極 (0, -90) → ≈ (180, 0)
-- Equator (90, 0) → ≈ (0, -90) / 赤道 (90, 0) → ≈ (0, -90)
+- North Pole (0, 90) → ≈ (0, 0)
+- South Pole (0, -90) → ≈ (180, 0)
+- Equator (90, 0) → ≈ (0, -90)
 
 ## Demo / デモ
 
-- **Interactive Globe**: <https://hfu.github.io/mu/> - MapLibre GL JS globe visualization / MapLibre GL JSグローブ表示
-- **PMTiles Viewer**: <https://pmtiles.io/?url=https://hfu.github.io/mu/mu.pmtiles.gz> - External PMTiles viewer / 外部PMTilesビューア
+- Interactive Globe: <https://hfu.github.io/mu/>
+- PMTiles Viewer: <https://pmtiles.io/?url=https://hfu.github.io/mu/mu.pmtiles.gz>
 
 ## Technical Stack / 技術スタック
 
-- **MapLibre GL JS v5.0.0**: For interactive globe visualization / インタラクティブなグローブ表示用
-- **PMTiles v3.0.6**: For efficient vector tile delivery / 効率的なベクトルタイル配信用
-- **tippecanoe**: Vector tile generation with longitude wraparound detection / 経度回り込み検出によるベクトルタイル生成
-- **jq**: Coordinate transformation processing / 座標変換処理
-- **GDAL/OGR**: Shapefile to GeoJSON conversion / シェープファイルからGeoJSONへの変換
+- MapLibre GL JS v5.0.0
+- PMTiles v3.0.6
+- tippecanoe
+- jq
+- GDAL/OGR
 

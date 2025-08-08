@@ -12,6 +12,7 @@
             margin: 0;
             padding: 0;
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #000; /* outside globe background */
         }
         
         #map {
@@ -19,6 +20,7 @@
             top: 0;
             bottom: 0;
             width: 100%;
+            background-color: #000; /* outside globe background */
         }
         
         .info-panel {
@@ -54,9 +56,9 @@
     <div id="map"></div>
     <div class="info-panel">
         <h1>Mu Projection Globe</h1>
-        <p>このマップは、Natural Earthの海岸線データをMu座標系に変換して表示しています。</p>
-        <p>Globe modeでの3D表示をお楽しみください。</p>
-        <p><strong>データソース:</strong> Natural Earth</p>
+        <p>Natural Earth 海岸線と地球地図南極</p>
+        <p>Rで自動回転。</p>
+        <p><strong>データ:</strong> Natural Earth / gmaq10</p>
     </div>
 
     <script>
@@ -67,21 +69,19 @@
         // MapLibre GL JS マップを初期化
         const map = new maplibregl.Map({
             container: 'map',
+            hash: true,
             style: {
                 version: 8,
+                glyphs: 'https://tile.openstreetmap.jp/fonts/{fontstack}/{range}.pbf',
                 sources: {
-                    'mu-coastline': {
-                        type: 'vector',
-                        url: 'pmtiles://./mu.pmtiles.gz'
-                    }
+                    'mu-coastline': { type: 'vector', url: 'pmtiles://./mu.pmtiles.gz' },
+                    'aq': { type: 'vector', url: 'pmtiles://./aq.pmtiles.gz' }
                 },
                 layers: [
                     {
                         id: 'background',
                         type: 'background',
-                        paint: {
-                            'background-color': '#1a1a2e'
-                        }
+                        paint: { 'background-color': '#1f1f1f' }
                     },
                     {
                         id: 'mu-coastline',
@@ -91,22 +91,167 @@
                         paint: {
                             'line-color': '#00ff88',
                             'line-width': [
-                                'interpolate',
-                                ['linear'],
-                                ['zoom'],
+                                'interpolate', ['linear'], ['zoom'],
                                 0, 0.5,
                                 5, 1,
                                 10, 2
                             ],
                             'line-opacity': 0.8
                         }
+                    },
+                    // AQ polygons (drawn before AQ lines/points)
+                    {
+                        id: 'aq-bnda-fill',
+                        type: 'fill',
+                        source: 'aq',
+                        'source-layer': 'bnda',
+                        paint: {
+                            'fill-color': '#f7f7f5'
+                        }
+                    },
+                    {
+                        id: 'aq-hydroa-fill',
+                        type: 'fill',
+                        source: 'aq',
+                        'source-layer': 'hydroa',
+                        paint: {
+                            'fill-color': '#f2f7ff'
+                        }
+                    },
+                    // AQ lines
+                    {
+                        id: 'aq-bndl-line',
+                        type: 'line',
+                        source: 'aq',
+                        'source-layer': 'bndl',
+                        paint: {
+                            'line-color': '#666666',
+                            'line-width': [
+                                'interpolate', ['linear'], ['zoom'],
+                                0, 0.3,
+                                5, 0.6,
+                                10, 1.2
+                            ],
+                            'line-opacity': 0.9
+                        }
+                    },
+                    {
+                        id: 'aq-hydrol-line',
+                        type: 'line',
+                        source: 'aq',
+                        'source-layer': 'hydrol',
+                        paint: {
+                            'line-color': '#4ea3ff',
+                            'line-width': [
+                                'interpolate', ['linear'], ['zoom'],
+                                0, 0.4,
+                                5, 1.0,
+                                10, 2.0
+                            ],
+                            'line-opacity': 0.9
+                        }
+                    },
+                    {
+                        id: 'aq-transl-line',
+                        type: 'line',
+                        source: 'aq',
+                        'source-layer': 'transl',
+                        paint: {
+                            'line-color': '#444444',
+                            'line-width': [
+                                'interpolate', ['linear'], ['zoom'],
+                                0, 0.3,
+                                5, 0.9,
+                                10, 1.8
+                            ],
+                            'line-opacity': 0.9
+                        }
+                    },
+                    // AQ points
+                    {
+                        id: 'aq-transp-point',
+                        type: 'circle',
+                        source: 'aq',
+                        'source-layer': 'transp',
+                        paint: {
+                            'circle-color': '#ff8800',
+                            'circle-radius': [
+                                'interpolate', ['linear'], ['zoom'],
+                                0, 2,
+                                6, 3,
+                                10, 4
+                            ],
+                            'circle-opacity': 0.9
+                        }
+                    },
+                    {
+                        id: 'aq-popp-label',
+                        type: 'symbol',
+                        source: 'aq',
+                        'source-layer': 'popp',
+                        layout: {
+                            'text-field': ['get', 'NAM'],
+                            'text-size': [
+                                'interpolate', ['linear'], ['zoom'],
+                                0, 11,
+                                6, 13,
+                                10, 15
+                            ],
+                            'text-font': ['Open Sans Regular', 'Arial Unicode MS Regular'],
+                            'text-offset': [0, 0.8]
+                        },
+                        paint: {
+                            'text-color': '#ffffff',
+                            'text-halo-color': 'rgba(0,0,0,0.8)',
+                            'text-halo-width': 1.2
+                        }
                     }
                 ]
             },
-            center: [0, 0],
-            zoom: 1,
+            center: [180, 0],
+            zoom: 4,
             pitch: 0,
             bearing: 0
+        });
+
+        // クリックで属性表示
+        const clickableLayers = [
+          'mu-coastline',
+          'aq-bnda-fill','aq-hydroa-fill',
+          'aq-bndl-line','aq-hydrol-line','aq-transl-line',
+          'aq-transp-point','aq-popp-label'
+        ];
+
+        function escapeHtml(s){
+          return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;','\'':'&#39;'}[c]));
+        }
+        function propsToHTML(props){
+          const entries = Object.entries(props || {})
+            .filter(([k,v]) => v !== null && v !== undefined && k !== 'tippecanoe')
+            .slice(0, 20);
+          if (!entries.length) return '<em>No attributes</em>';
+          return '<table style="border-collapse:collapse;">' +
+                 entries.map(([k,v]) => `<tr><th style="text-align:left;padding-right:6px;">${escapeHtml(k)}</th><td>${escapeHtml(v)}</td></tr>`).join('') +
+                 '</table>';
+        }
+
+        map.on('click', (e) => {
+          const features = map.queryRenderedFeatures(e.point, { layers: clickableLayers });
+          if (!features.length) return;
+          const f = features[0];
+          const title = f.layer && f.layer.id ? escapeHtml(f.layer.id) : 'feature';
+          const html = `<div><strong>${title}</strong>${f.properties && f.properties.NAM ? `: ${escapeHtml(f.properties.NAM)}` : ''}</div>` +
+                       `<div style="margin-top:6px;">${propsToHTML(f.properties)}</div>`;
+          new maplibregl.Popup({ closeButton: true })
+            .setLngLat(e.lngLat)
+            .setHTML(html)
+            .addTo(map);
+        });
+
+        // ホバーでポインター表示
+        clickableLayers.forEach(layerId => {
+          map.on('mouseenter', layerId, () => { map.getCanvas().style.cursor = 'pointer'; });
+          map.on('mouseleave', layerId, () => { map.getCanvas().style.cursor = ''; });
         });
 
         // マップ読み込み完了時の処理
@@ -124,9 +269,9 @@
             console.log('Map loaded with globe projection and mu.pmtiles.gz data');
         });
 
-        // エラーハンドリング
+        // エラーハンドリング（詳細表示）
         map.on('error', (e) => {
-            console.error('Map error:', e);
+            console.error('Map error:', e && (e.error || e));
         });
 
         // データソースエラーハンドリング
@@ -160,13 +305,11 @@
 
         function rotateCamera() {
             if (!isRotating) return;
-            
             map.easeTo({
-                bearing: map.getBearing() + 0.5,
+                bearing: map.getBearing() - 0.5,
                 duration: 100,
                 easing: (t) => t
             });
-            
             requestAnimationFrame(rotateCamera);
         }
 
